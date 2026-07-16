@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Botsmith — Tempa Robot Trading MT5 Tanpa Coding</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#0c0d11;
+    --panel:#15171d;
+    --panel2:#1b1e26;
+    --border:#282c35;
+    --border-soft:#20232b;
+    --accent:#ff7a45;
+    --accent-dim:#b8501f;
+    --accent-glow:rgba(255,122,69,0.14);
+    --blueprint:#4fa3c7;
+    --text:#e8eaef;
+    --text-dim:#8b91a0;
+    --text-faint:#575c6a;
+    --buy:#3ddc97;
+    --sell:#f0616b;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{ font-family:'Barlow Condensed',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; margin:0; }
+  code,.mono{ font-family:'JetBrains Mono',monospace; }
+
+  /* blueprint schematic backdrop */
+  .bg-grid{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(79,163,199,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,163,199,0.05) 1px, transparent 1px);
+    background-size:38px 38px;
+    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+  }
+
+  .app{ position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:28px 20px 60px; }
+
+  header.top{ display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+  .logo-mark{
+    width:38px;height:38px;border-radius:9px;
+    background:linear-gradient(135deg, var(--accent), #7a2e10);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600; color:#120904; font-size:18px;
+    flex-shrink:0;
+  }
+  header.top h1{ font-size:19px; color:var(--text); letter-spacing:0.2px; }
+  header.top p{ margin:2px 0 0; color:var(--text-dim); font-size:13px; }
+
+  .layout{ display:grid; grid-template-columns:220px 1fr; gap:24px; align-items:start; }
+  @media (max-width:860px){ .layout{ grid-template-columns:1fr; } }
+
+  /* Stepper */
+  .stepper{ display:flex; flex-direction:column; gap:2px; position:sticky; top:20px; }
+  @media (max-width:860px){
+    .stepper{ flex-direction:row; overflow-x:auto; position:static; gap:8px; padding-bottom:4px;}
+  }
+  .step-item{
+    display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:8px;
+    color:var(--text-faint); font-size:13.5px; cursor:default; border:1px solid transparent;
+  }
+  .step-item.active{ background:var(--panel2); color:var(--text); border-color:var(--border-soft); }
+  .step-item.done{ color:var(--text-dim); }
+  .step-num{
+    width:22px;height:22px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500;
+    border:1px solid var(--border); color:var(--text-faint);
+  }
+  .step-item.active .step-num{ background:var(--accent); border-color:var(--accent); color:#0e1015; }
+  .step-item.done .step-num{ background:transparent; border-color:var(--accent-dim); color:var(--accent); }
+  .step-item .step-label b{ display:block; font-weight:600; }
+  .step-item .step-label span{ display:block; font-size:11px; color:var(--text-faint); margin-top:1px; }
+  @media (max-width:860px){ .step-item .step-label span{display:none;} .step-item{white-space:nowrap;} }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+    padding:26px 26px 24px;
+  }
+  .panel h2{ font-size:17px; margin-bottom:4px; }
+  .panel .sub{ color:var(--text-dim); font-size:13px; margin-bottom:22px; }
+
+  /* Template cards */
+  .tpl-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
+  @media (max-width:700px){ .tpl-grid{ grid-template-columns:1fr; } }
+  .tpl-card{
+    border:1px solid var(--border-soft); background:var(--panel2); border-radius:9px;
+    padding:18px; cursor:pointer; transition:border-color .15s, transform .1s; position:relative;
+  }
+  .tpl-card:hover{ border-color:var(--accent-dim); }
+  .tpl-card.selected{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 0 24px var(--accent-glow); }
+  .tpl-card .icon{ font-size:22px; margin-bottom:10px; display:block; }
+  .tpl-card h3{ font-size:14.5px; margin-bottom:6px; }
+  .tpl-card p{ font-size:12.5px; color:var(--text-dim); line-height:1.5; margin:0; }
+  .tpl-card .tag{ display:inline-block; margin-top:10px; font-size:10.5px; font-family:'JetBrains Mono',monospace; color:var(--accent); background:var(--accent-glow); padding:2px 7px; border-radius:4px; }
+
+  /* Forms */
+  .field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px 20px; }
+  @media (max-width:600px){ .field-grid{ grid-template-columns:1fr; } }
+  .field{ margin-bottom:4px; }
+  .field.full{ grid-column:1 / -1; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; }
+  .field label .hint{ color:var(--text-faint); font-weight:400; }
+  input[type=text], input[type=number], select{
+    width:100%; background:#12151c; border:1px solid var(--border); color:var(--text);
+    padding:9px 11px; border-radius:7px; font-size:13.5px; font-family:'JetBrains Mono',monospace;
+    outline:none;
+  }
+  input:focus, select:focus{ border-color:var(--accent); }
+  .radio-row{ display:flex; gap:10px; }
+  .radio-opt{
+    flex:1; border:1px solid var(--border); border-radius:7px; padding:8px 10px; cursor:pointer;
+    font-size:13px; color:var(--text-dim); text-align:center; user-select:none;
+  }
+  .radio-opt.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+
+  .switch-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border:1px solid var(--border-soft); border-radius:8px; padding:12px 14px; margin-bottom:14px;
+  }
+  .switch-row .lbl{ font-size:13.5px; }
+  .switch-row .lbl .d{ font-size:11.5px; color:var(--text-faint); margin-top:2px; }
+  .switch{ width:38px; height:22px; border-radius:20px; background:#12151c; border:1px solid var(--border); position:relative; cursor:pointer; flex-shrink:0; }
+  .switch .knob{ width:16px;height:16px; border-radius:50%; background:var(--text-faint); position:absolute; top:2px; left:2px; transition:.15s; }
+  .switch.on{ background:var(--accent-glow); border-color:var(--accent-dim); }
+  .switch.on .knob{ left:18px; background:var(--accent); }
+  .sub-fields{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:2px 2px 12px; }
+
+  fieldset.group{ border:1px solid var(--border-soft); border-radius:9px; padding:16px 16px 4px; margin-bottom:18px; }
+  fieldset.group legend{ font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); padding:0 6px; font-family:'JetBrains Mono',monospace; }
+
+  .nav-row{ display:flex; justify-content:space-between; margin-top:26px; }
+  button{ font-family:'Inter',sans-serif; cursor:pointer; border:none; border-radius:7px; font-size:13.5px; padding:10px 18px; }
+  .btn-primary{ background:var(--accent); color:#14110a; font-weight:600; }
+  .btn-primary:disabled{ background:#3a3626; color:#6b644a; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; border:1px solid var(--border); color:var(--text-dim); }
+  .btn-ghost:hover{ border-color:var(--text-faint); }
+
+  /* MT5-style input preview (signature element, blueprint corner marks) */
+  .mt5-window-wrap{ position:relative; padding:8px; margin-bottom:22px; }
+  .mt5-window-wrap::before, .mt5-window-wrap::after{
+    content:''; position:absolute; width:16px; height:16px; pointer-events:none;
+  }
+  .mt5-window-wrap::before{ top:0; left:0; border-top:2px solid var(--blueprint); border-left:2px solid var(--blueprint); }
+  .mt5-window-wrap::after{ bottom:0; right:0; border-bottom:2px solid var(--blueprint); border-right:2px solid var(--blueprint); }
+  .mt5-window{
+    border:1px solid var(--border-soft); border-radius:9px; overflow:hidden;
+    background:#0f1114;
+  }
+  .mt5-titlebar{
+    background:#1a1e28; padding:8px 12px; font-size:12px; color:var(--text-dim);
+    border-bottom:1px solid var(--border-soft); display:flex; align-items:center; gap:8px;
+  }
+  .mt5-titlebar .dot{ width:9px;height:9px;border-radius:50%; }
+  .mt5-titlebar .dot.r{background:#f0616b;} .mt5-titlebar .dot.y{background:#e3b13c;} .mt5-titlebar .dot.g{background:#3ddc97;}
+  .mt5-titlebar .name{ margin-left:6px; font-family:'JetBrains Mono',monospace; }
+  .mt5-table{ width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:12.5px; }
+  .mt5-table tr:not(:last-child) td{ border-bottom:1px solid #1a1e28; }
+  .mt5-table td{ padding:7px 12px; }
+  .mt5-table td:first-child{ color:var(--text-dim); width:60%; }
+  .mt5-table td:last-child{ color:var(--accent); text-align:right; }
+  .mt5-table tr.group-row td{ color:var(--text-faint); background:#131720; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; padding:6px 12px; }
+
+  .code-box{
+    background:#0a0c10; border:1px solid var(--border-soft); border-radius:9px;
+    max-height:420px; overflow:auto; padding:16px 18px; margin-bottom:16px;
+  }
+  .code-box pre{ margin:0; font-size:12px; line-height:1.6; color:#c9cfda; white-space:pre; }
+  .code-box .kw{ color:#e3a73c; } .code-box .cm{ color:#5b6272; } .code-box .tp{ color:#3ddc97; }
+
+  .action-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .note{
+    display:flex; gap:10px; background:var(--accent-glow); border:1px solid var(--border-soft);
+    border-left:3px solid var(--accent); border-radius:7px; padding:12px 14px; font-size:12.5px; color:var(--text-dim); line-height:1.6;
+  }
+  .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:5px; font-family:'JetBrains Mono',monospace; }
+  .badge.buy{ background:rgba(61,220,151,0.12); color:var(--buy); }
+  .badge.sell{ background:rgba(240,97,107,0.12); color:var(--sell); }
+
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:#2a3040; border-radius:5px; }
+
+  /* Preset bar */
+  .preset-bar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--border-soft); border-radius:9px;
+    padding:10px 14px; margin-bottom:18px; font-size:12.5px;
+  }
+  .preset-bar .lbl{ color:var(--text-faint); font-family:'JetBrains Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
+  .preset-bar select{ width:auto; min-width:160px; padding:6px 9px; font-size:12.5px; }
+  .preset-bar .btn-mini{ background:transparent; border:1px solid var(--border); color:var(--text-dim); padding:6px 11px; border-radius:6px; font-size:12px; }
+  .preset-bar .btn-mini:hover{ border-color:var(--accent-dim); color:var(--accent); }
+  .preset-bar .btn-mini.danger:hover{ border-color:var(--sell); color:var(--sell); }
+  .preset-bar .spacer{ flex:1; }
+  .preset-bar .empty-hint{ color:var(--text-faint); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="app">
+  <header class="top">
+    <div class="logo-mark">⚒</div>
+    <div>
+      <h1>Botsmith</h1>
+      <p>Tempa robot trading untuk MetaTrader 5 dengan mengisi form — tanpa menulis satu baris kode.</p>
+    </div>
+  </header>
+
+  <div id="presetBarWrap"></div>
+
+  <div class="layout">
+    <div class="stepper" id="stepper"></div>
+    <div class="panel" id="panelContent"></div>
+  </div>
+</div>
+
+<script>
+const STEPS = [
+  {label:"Pilih Strategi", desc:"Template EA"},
+  {label:"Pengaturan Umum", desc:"Lot, SL/TP, risk"},
+  {label:"Pengaturan Strategi", desc:"Parameter khusus"},
+  {label:"Ambil Kode", desc:"Preview & download"},
+];
+
+const TEMPLATES = {
+  breakout:{
+    icon:"📐", name:"Breakout (Zone/Range)",
+    desc:"Entry saat harga menembus level tertinggi/terendah dari beberapa candle terakhir. Cocok untuk gold/forex saat market mulai bergerak trending."
+  },
+  grid:{
+    icon:"🪜", name:"Grid / Martingale / DCA",
+    desc:"Menambah posisi bertahap saat harga bergerak melawan posisi awal, dengan lot membesar. Menutup semua saat total profit tercapai."
+  },
+  crossover:{
+    icon:"📈", name:"Indikator Crossover",
+    desc:"Entry berdasarkan persilangan Moving Average (cepat vs lambat), opsional difilter dengan RSI supaya tidak entry saat overbought/oversold."
+  },
+  ictsmc:{
+    icon:"🧲", name:"ICT/SMC Liquidity Sweep",
+    desc:"Entry saat harga 'menyapu' (sweep) swing high/low lalu ditolak kembali ke dalam range — konsep liquidity grab ala ICT/Smart Money Concept."
+  }
+};
+
+let state = {
+  step: 0,
+  template: null,
+  eaName: "MyCustomEA",
+  magic: 234001,
+  lotMode: "fixed",
+  fixedLot: 0.01,
+  riskPercent: 1,
+  slPips: 300,
+  tpPips: 600,
+  maxSpread: 30,
+  useTrailing: false,
+  trailingStart: 200,
+  trailingStep: 50,
+  useTimeFilter: false,
+  startHour: 0,
+  endHour: 23,
+  useDailyLoss: false,
+  maxDailyLossUSD: 100,
+  useNewsFilter: false,
+  newsCurrency: "USD",
+  newsMinutesBefore: 30,
+  newsMinutesAfter: 30,
+  newsImportance: "2",
+  params: {
+    breakout: { rangeBars: 20, breakoutBuffer: 20 },
+    grid: { initialLot: 0.01, lotMultiplier: 1.5, gridStep: 150, maxTrades: 5, basketTP: 10, direction: "both" },
+    crossover: { fastMA: 10, slowMA: 50, maMethod: "MODE_EMA", appliedPrice: "PRICE_CLOSE", useRSIFilter: false, rsiPeriod: 14, rsiOB: 70, rsiOS: 30 },
+    ictsmc: { swingLookback: 15, wickBufferPts: 20, rrRatio: 2.0 }
+  }
+};
+
+/* ================= PRESET STORAGE (localStorage, per-device) ================= */
+const PRESET_PREFIX = 'botsmith_preset:';
+let presetKeys = [];
+let storageAvailable = (function(){
+  try{
+    const t = '__botsmith_test__';
+    localStorage.setItem(t, '1');
+    localStorage.removeItem(t);
+    return true;
+  }catch(e){ return false; }
+})();
+
+function refreshPresetList(){
+  if(!storageAvailable){ renderPresetBar(); return; }
+  presetKeys = Object.keys(localStorage).filter(k=>k.startsWith(PRESET_PREFIX));
+  renderPresetBar();
+}
+
+function renderPresetBar(){
+  const el = document.getElementById('presetBarWrap');
+  if(!el) return;
+  if(!storageAvailable){
+    el.innerHTML = `<div class="preset-bar"><span class="empty-hint">⚠️ Browser ini tidak mengizinkan penyimpanan lokal, fitur preset tidak tersedia.</span></div>`;
+    return;
+  }
+  const options = presetKeys.map(k=>{
+    const name = k.replace(PRESET_PREFIX,'');
+    return `<option value="${k}">${name}</option>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="preset-bar">
+      <span class="lbl">Preset</span>
+      ${presetKeys.length ? `
+        <select id="presetSelect">${options}</select>
+        <button class="btn-mini" onclick="loadSelectedPreset()">Muat</button>
+        <button class="btn-mini danger" onclick="deleteSelectedPreset()">Hapus</button>
+      ` : `<span class="empty-hint">Belum ada preset tersimpan di browser ini</span>`}
+      <span class="spacer"></span>
+      <button class="btn-mini" onclick="savePreset()">💾 Simpan Preset Ini</button>
+    </div>
+  `;
+}
+
+function savePreset(){
+  if(!storageAvailable) return;
+  const name = prompt('Nama preset (contoh: "Grid-XAUUSD-Konservatif"):');
+  if(!name) return;
+  const safeName = name.trim().replace(/[\s\/\\'"]+/g, '-').slice(0, 60);
+  if(!safeName){ alert('Nama preset tidak valid.'); return; }
+  const key = PRESET_PREFIX + safeName;
+  const data = JSON.parse(JSON.stringify(state));
+  delete data.step;
+  try{
+    localStorage.setItem(key, JSON.stringify(data));
+    refreshPresetList();
+  }catch(e){ alert('Gagal menyimpan preset: ' + e); }
+}
+
+function loadSelectedPreset(){
+  const sel = document.getElementById('presetSelect');
+  if(!sel) return;
+  const key = sel.value;
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw){
+      const data = JSON.parse(raw);
+      state = Object.assign(state, data, {step: 0});
+      render();
+    }
+  }catch(e){ alert('Gagal memuat preset: ' + e); }
+}
+
+function deleteSelectedPreset(){
+  const sel = document.getElementById('presetSelect');
+  if(!sel) return;
+  const key = sel.value;
+  if(!confirm('Hapus preset "' + key.replace(PRESET_PREFIX,'') + '"?')) return;
+  try{
+    localStorage.removeItem(key);
+    refreshPresetList();
+  }catch(e){ alert('Gagal menghapus preset: ' + e); }
+}
+
+function renderStepper(){
+  const el = document.getElementById('stepper');
+  el.innerHTML = STEPS.map((s,i)=>{
+    let cls = i===state.step ? 'active' : (i<state.step ? 'done' : '');
+    return `<div class="step-item ${cls}">
+      <div class="step-num">${i<state.step?'✓':i+1}</div>
+      <div class="step-label"><b>${s.label}</b><span>${s.desc}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function goTo(step){
+  if(step===1 && !state.template) return;
+  state.step = step;
+  render();
+}
+function next(){ if(canProceed()) goTo(state.step+1); }
+function prev(){ goTo(Math.max(0,state.step-1)); }
+
+function canProceed(){
+  if(state.step===0) return !!state.template;
+  if(state.step===2 && state.template==='crossover'){
+    return Number(state.params.crossover.fastMA) < Number(state.params.crossover.slowMA);
+  }
+  return true;
+}
+
+function set(path, value){
+  const parts = path.split('.');
+  let obj = state;
+  for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]];
+  obj[parts[parts.length-1]] = value;
+  render();
+}
+function toggle(path){
+  const parts = path.split('.');
+  let obj = state;
+  for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]];
+  obj[parts[parts.length-1]] = !obj[parts[parts.length-1]];
+  render();
+}
+
+function render(){
+  //--- simpan fokus & posisi kursor input aktif supaya keyboard HP tidak tertutup tiap re-render
+  const active = document.activeElement;
+  let focusField = null, selStart = null, selEnd = null;
+  if(active && active.dataset && active.dataset.field){
+    focusField = active.dataset.field;
+    if(typeof active.selectionStart === 'number'){
+      selStart = active.selectionStart;
+      selEnd = active.selectionEnd;
+    }
+  }
+
+  renderStepper();
+  const c = document.getElementById('panelContent');
+  if(state.step===0) c.innerHTML = renderStep0();
+  else if(state.step===1) c.innerHTML = renderStep1();
+  else if(state.step===2) c.innerHTML = renderStep2();
+  else c.innerHTML = renderStep3();
+
+  //--- pulihkan fokus & kursor ke input yang sama
+  if(focusField){
+    const el = c.querySelector('[data-field="' + focusField + '"]');
+    if(el){
+      el.focus({preventScroll:true});
+      if(selStart !== null && el.setSelectionRange){
+        try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+}
+
+function renderStep0(){
+  const cards = Object.entries(TEMPLATES).map(([key,t])=>`
+    <div class="tpl-card ${state.template===key?'selected':''}" onclick="set('template','${key}')">
+      <span class="icon">${t.icon}</span>
+      <h3>${t.name}</h3>
+      <p>${t.desc}</p>
+      <span class="tag">.mq5</span>
+    </div>
+  `).join('');
+  return `
+    <h2>Pilih jenis strategi EA</h2>
+    <p class="sub">Ini menentukan logic dasar robot. Detail parameter diatur di langkah berikutnya.</p>
+    <div class="tpl-grid">${cards}</div>
+    <div class="nav-row">
+      <span></span>
+      <button class="btn-primary" ${!state.template?'disabled':''} onclick="next()">Lanjut →</button>
+    </div>
+  `;
+}
+
+function radioRow(path, val, options){
+  return `<div class="radio-row">${options.map(o=>`
+    <div class="radio-opt ${val===o.value?'on':''}" onclick="set('${path}','${o.value}')">${o.label}</div>
+  `).join('')}</div>`;
+}
+function switchRow(path, checked, label, desc, subfieldsHtml){
+  return `
+    <div class="switch-row">
+      <div class="lbl">${label}<div class="d">${desc}</div></div>
+      <div class="switch ${checked?'on':''}" onclick="toggle('${path}')"><div class="knob"></div></div>
+    </div>
+    ${checked && subfieldsHtml ? `<div class="sub-fields">${subfieldsHtml}</div>` : ''}
+  `;
+}
+
+function renderStep1(){
+  return `
+    <h2>Pengaturan umum</h2>
+    <p class="sub">Berlaku untuk semua jenis strategi: ukuran lot, stop loss/take profit, dan proteksi risiko.</p>
+
+    <fieldset class="group"><legend>Identitas EA</legend>
+      <div class="field-grid" style="padding-bottom:16px;">
+        <div class="field"><label>Nama EA</label>
+          <input type="text" value="${state.eaName}" data-field="eaName" oninput="set('eaName', this.value)"></div>
+        <div class="field"><label>Magic Number <span class="hint">(ID unik EA ini)</span></label>
+          <input type="number" value="${state.magic}" data-field="magic" oninput="set('magic', Number(this.value))"></div>
+      </div>
+    </fieldset>
+
+    <fieldset class="group"><legend>Ukuran Lot</legend>
+      <div class="field full" style="margin-bottom:14px;">
+        ${radioRow('lotMode', state.lotMode, [{value:'fixed',label:'Lot Tetap'},{value:'risk',label:'Risk % Saldo'}])}
+      </div>
+      <div class="field-grid" style="padding-bottom:16px;">
+        ${state.lotMode==='fixed' ? `
+          <div class="field"><label>Lot Size</label>
+            <input type="number" step="0.01" value="${state.fixedLot}" data-field="fixedLot" oninput="set('fixedLot', Number(this.value))"></div>
+        ` : `
+          <div class="field"><label>Risk % per Trade</label>
+            <input type="number" step="0.1" value="${state.riskPercent}" data-field="riskPercent" oninput="set('riskPercent', Number(this.value))"></div>
+        `}
+      </div>
+    </fieldset>
+
+    <fieldset class="group"><legend>Stop Loss / Take Profit</legend>
+      <div class="field-grid" style="padding-bottom:16px;">
+        <div class="field"><label>Stop Loss <span class="hint">(poin)</span></label>
+          <input type="number" value="${state.slPips}" data-field="slPips" oninput="set('slPips', Number(this.value))"></div>
+        <div class="field"><label>Take Profit <span class="hint">(poin)</span></label>
+          <input type="number" value="${state.tpPips}" data-field="tpPips" oninput="set('tpPips', Number(this.value))"></div>
+        <div class="field"><label>Max Spread Diizinkan <span class="hint">(poin)</span></label>
+          <input type="number" value="${state.maxSpread}" data-field="maxSpread" oninput="set('maxSpread', Number(this.value))"></div>
+      </div>
+      <div class="note">💡 Untuk XAUUSD, nilai "poin" tergantung broker (biasanya 1 poin = $0.01). Cek dulu di Market Watch broker Anda sebelum set angka SL/TP.</div>
+      <div style="height:14px"></div>
+    </fieldset>
+
+    <fieldset class="group"><legend>Fitur Tambahan</legend>
+      ${switchRow('useTrailing', state.useTrailing, 'Trailing Stop', 'Geser SL otomatis mengikuti profit', `
+        <div class="field"><label>Mulai Trailing <span class="hint">(poin profit)</span></label>
+          <input type="number" value="${state.trailingStart}" data-field="trailingStart" oninput="set('trailingStart', Number(this.value))"></div>
+        <div class="field"><label>Jarak Trailing <span class="hint">(poin)</span></label>
+          <input type="number" value="${state.trailingStep}" data-field="trailingStep" oninput="set('trailingStep', Number(this.value))"></div>
+      `)}
+      ${switchRow('useTimeFilter', state.useTimeFilter, 'Filter Jam Trading', 'EA hanya trading di jam tertentu (waktu server broker)', `
+        <div class="field"><label>Jam Mulai (0-23)</label>
+          <input type="number" min="0" max="23" value="${state.startHour}" data-field="startHour" oninput="set('startHour', Number(this.value))"></div>
+        <div class="field"><label>Jam Selesai (0-23)</label>
+          <input type="number" min="0" max="23" value="${state.endHour}" data-field="endHour" oninput="set('endHour', Number(this.value))"></div>
+      `)}
+      ${switchRow('useDailyLoss', state.useDailyLoss, 'Proteksi Loss Harian', 'EA berhenti trading kalau rugi harian tembus batas', `
+        <div class="field"><label>Batas Rugi Harian <span class="hint">(USD)</span></label>
+          <input type="number" value="${state.maxDailyLossUSD}" data-field="maxDailyLossUSD" oninput="set('maxDailyLossUSD', Number(this.value))"></div>
+      `)}
+      ${switchRow('useNewsFilter', state.useNewsFilter, 'Filter Berita Ekonomi (High Impact News)', 'EA berhenti sementara di sekitar jam rilis berita penting, pakai Economic Calendar bawaan MT5', `
+        <div class="field"><label>Mata Uang Dipantau</label>
+          <select onchange="set('newsCurrency', this.value)">
+            ${["USD","EUR","GBP","JPY","AUD","XAU"].map(c=>`<option value="${c}" ${state.newsCurrency===c?'selected':''}>${c}</option>`).join('')}
+          </select></div>
+        <div class="field"><label>Tingkat Kepentingan Minimum</label>
+          <select onchange="set('newsImportance', this.value)">
+            <option value="1" ${state.newsImportance==='1'?'selected':''}>Rendah ke atas</option>
+            <option value="2" ${state.newsImportance==='2'?'selected':''}>Sedang ke atas</option>
+            <option value="3" ${state.newsImportance==='3'?'selected':''}>Tinggi saja</option>
+          </select></div>
+        <div class="field"><label>Berhenti Sebelum Berita <span class="hint">(menit)</span></label>
+          <input type="number" value="${state.newsMinutesBefore}" data-field="newsMinutesBefore" oninput="set('newsMinutesBefore', Number(this.value))"></div>
+        <div class="field"><label>Berhenti Setelah Berita <span class="hint">(menit)</span></label>
+          <input type="number" value="${state.newsMinutesAfter}" data-field="newsMinutesAfter" oninput="set('newsMinutesAfter', Number(this.value))"></div>
+      `)}
+    </fieldset>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="prev()">← Kembali</button>
+      <button class="btn-primary" onclick="next()">Lanjut →</button>
+    </div>
+  `;
+}
+
+function renderStep2(){
+  const t = state.template;
+  let body = '';
+  if(t==='breakout'){
+    const p = state.params.breakout;
+    body = `
+      <div class="field-grid" style="padding-bottom:6px;">
+        <div class="field"><label>Jumlah Candle Range <span class="hint">(untuk cari high/low)</span></label>
+          <input type="number" value="${p.rangeBars}" data-field="params.breakout.rangeBars" oninput="set('params.breakout.rangeBars', Number(this.value))"></div>
+        <div class="field"><label>Buffer Konfirmasi Breakout <span class="hint">(poin)</span></label>
+          <input type="number" value="${p.breakoutBuffer}" data-field="params.breakout.breakoutBuffer" oninput="set('params.breakout.breakoutBuffer', Number(this.value))"></div>
+      </div>
+      <div class="note">💡 Semakin besar "Jumlah Candle Range", semakin besar level breakout yang dipakai (lebih jarang tapi lebih valid). Buffer mencegah entry karena breakout palsu tipis.</div>
+    `;
+  } else if(t==='grid'){
+    const p = state.params.grid;
+    body = `
+      <div class="field-grid" style="padding-bottom:6px;">
+        <div class="field"><label>Lot Awal</label>
+          <input type="number" step="0.01" value="${p.initialLot}" data-field="params.grid.initialLot" oninput="set('params.grid.initialLot', Number(this.value))"></div>
+        <div class="field"><label>Lot Multiplier <span class="hint">(pembesar tiap level)</span></label>
+          <input type="number" step="0.1" value="${p.lotMultiplier}" data-field="params.grid.lotMultiplier" oninput="set('params.grid.lotMultiplier', Number(this.value))"></div>
+        <div class="field"><label>Jarak Antar Level <span class="hint">(poin)</span></label>
+          <input type="number" value="${p.gridStep}" data-field="params.grid.gridStep" oninput="set('params.grid.gridStep', Number(this.value))"></div>
+        <div class="field"><label>Maksimal Jumlah Level</label>
+          <input type="number" value="${p.maxTrades}" data-field="params.grid.maxTrades" oninput="set('params.grid.maxTrades', Number(this.value))"></div>
+        <div class="field"><label>Target Profit Basket <span class="hint">(USD, tutup semua)</span></label>
+          <input type="number" value="${p.basketTP}" data-field="params.grid.basketTP" oninput="set('params.grid.basketTP', Number(this.value))"></div>
+        <div class="field"><label>Arah Trading</label>
+          <select onchange="set('params.grid.direction', this.value)">
+            <option value="both" ${p.direction==='both'?'selected':''}>Dua arah (Buy & Sell)</option>
+            <option value="buy" ${p.direction==='buy'?'selected':''}>Buy saja</option>
+            <option value="sell" ${p.direction==='sell'?'selected':''}>Sell saja</option>
+          </select>
+        </div>
+      </div>
+      <div class="note">⚠️ Strategi grid/martingale bisa menyebabkan drawdown besar saat trend kuat melawan posisi. Selalu tes di akun demo dulu dan sesuaikan "Maksimal Jumlah Level" dengan modal Anda.</div>
+    `;
+  } else if(t==='crossover'){
+    const p = state.params.crossover;
+    body = `
+      <div class="field-grid" style="padding-bottom:6px;">
+        <div class="field"><label>MA Cepat <span class="hint">(periode)</span></label>
+          <input type="number" value="${p.fastMA}" data-field="params.crossover.fastMA" oninput="set('params.crossover.fastMA', Number(this.value))"></div>
+        <div class="field"><label>MA Lambat <span class="hint">(periode)</span></label>
+          <input type="number" value="${p.slowMA}" data-field="params.crossover.slowMA" oninput="set('params.crossover.slowMA', Number(this.value))"></div>
+        <div class="field"><label>Metode MA</label>
+          <select onchange="set('params.crossover.maMethod', this.value)">
+            <option value="MODE_EMA" ${p.maMethod==='MODE_EMA'?'selected':''}>Exponential (EMA)</option>
+            <option value="MODE_SMA" ${p.maMethod==='MODE_SMA'?'selected':''}>Simple (SMA)</option>
+            <option value="MODE_SMMA" ${p.maMethod==='MODE_SMMA'?'selected':''}>Smoothed (SMMA)</option>
+            <option value="MODE_LWMA" ${p.maMethod==='MODE_LWMA'?'selected':''}>Weighted (LWMA)</option>
+          </select>
+        </div>
+        <div class="field"><label>Harga Acuan</label>
+          <select onchange="set('params.crossover.appliedPrice', this.value)">
+            <option value="PRICE_CLOSE" ${p.appliedPrice==='PRICE_CLOSE'?'selected':''}>Close</option>
+            <option value="PRICE_OPEN" ${p.appliedPrice==='PRICE_OPEN'?'selected':''}>Open</option>
+            <option value="PRICE_MEDIAN" ${p.appliedPrice==='PRICE_MEDIAN'?'selected':''}>Median (H+L)/2</option>
+          </select>
+        </div>
+      </div>
+      ${state.params.crossover.fastMA >= state.params.crossover.slowMA ? '<div class="note" style="border-left-color:var(--sell)">⚠️ MA Cepat harus lebih kecil dari MA Lambat.</div>' : ''}
+      <div style="height:14px"></div>
+      ${switchRow('params.crossover.useRSIFilter', p.useRSIFilter, 'Filter RSI', 'Hindari entry saat overbought/oversold', `
+        <div class="field"><label>Periode RSI</label>
+          <input type="number" value="${p.rsiPeriod}" data-field="params.crossover.rsiPeriod" oninput="set('params.crossover.rsiPeriod', Number(this.value))"></div>
+        <div class="field"><label>Overbought</label>
+          <input type="number" value="${p.rsiOB}" data-field="params.crossover.rsiOB" oninput="set('params.crossover.rsiOB', Number(this.value))"></div>
+        <div class="field"><label>Oversold</label>
+          <input type="number" value="${p.rsiOS}" data-field="params.crossover.rsiOS" oninput="set('params.crossover.rsiOS', Number(this.value))"></div>
+      `)}
+    `;
+  } else if(t==='ictsmc'){
+    const p = state.params.ictsmc;
+    body = `
+      <div class="field-grid" style="padding-bottom:6px;">
+        <div class="field"><label>Lookback Swing High/Low <span class="hint">(jumlah candle)</span></label>
+          <input type="number" value="${p.swingLookback}" data-field="params.ictsmc.swingLookback" oninput="set('params.ictsmc.swingLookback', Number(this.value))"></div>
+        <div class="field"><label>Buffer SL di Luar Sweep <span class="hint">(poin)</span></label>
+          <input type="number" value="${p.wickBufferPts}" data-field="params.ictsmc.wickBufferPts" oninput="set('params.ictsmc.wickBufferPts', Number(this.value))"></div>
+        <div class="field"><label>Rasio Risk:Reward <span class="hint">(TP = SL x rasio)</span></label>
+          <input type="number" step="0.1" value="${p.rrRatio}" data-field="params.ictsmc.rrRatio" oninput="set('params.ictsmc.rrRatio', Number(this.value))"></div>
+      </div>
+      <div class="note">💡 Logic: EA mencari swing high/low dari beberapa candle terakhir. Kalau ada candle yang menembus level itu dengan wick tapi <b>ditutup kembali di dalam range</b> (tanda liquidity sweep/stop hunt), EA entry berlawanan arah tembusan tadi. SL dan TP di sini menggantikan Stop Loss/Take Profit poin di Pengaturan Umum — TP dihitung otomatis dari rasio Risk:Reward.</div>
+    `;
+  }
+  return `
+    <h2>Pengaturan strategi: ${TEMPLATES[t].name}</h2>
+    <p class="sub">Parameter khusus untuk logic entry strategi ini.</p>
+    ${body}
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="prev()">← Kembali</button>
+      <button class="btn-primary" ${!canProceed()?'disabled':''} onclick="next()">Lanjut ke Kode →</button>
+    </div>
+  `;
+}
+
+function renderStep3(){
+  const code = generateCode();
+  return `
+    <h2>Kode EA siap dipakai</h2>
+    <p class="sub">Cek ringkasan input di bawah (tampilan menyerupai jendela input MT5), lalu unduh file <code>.mq5</code>.</p>
+
+    <div class="mt5-window-wrap">
+      <div class="mt5-window">
+        <div class="mt5-titlebar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><span class="name">${state.eaName}.mq5 — Inputs</span></div>
+        <table class="mt5-table">${renderMT5Preview()}</table>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-primary" onclick="downloadCode()">⬇ Download ${state.eaName}.mq5</button>
+      <button class="btn-ghost" onclick="copyCode()">📋 Copy Kode</button>
+    </div>
+
+    <div class="code-box"><pre id="codePre">${escapeHtml(code)}</pre></div>
+
+    <div class="note" style="margin-bottom:16px;">
+      <div>
+        <b style="color:var(--text)">Cara pakai di MetaTrader 5:</b><br>
+        1) Buka <b>MetaEditor</b> (F4 dari MT5) → File → New → Expert Advisor → beri nama, lalu ganti seluruh isi dengan file yang di-download.<br>
+        2) Compile (F7). Pastikan tidak ada error merah.<br>
+        3) Di MT5, drag EA dari Navigator ke chart simbol yang sesuai (misal XAUUSD, timeframe M1/M5).<br>
+        4) Aktifkan <b>Algo Trading</b>, centang "Allow Algo Trading" di tab Common saat attach.<br>
+        5) <b>Tes di akun demo dulu</b> minimal beberapa minggu sebelum pakai akun real.
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="prev()">← Kembali</button>
+      <button class="btn-ghost" onclick="goTo(0)">↺ Buat EA Baru</button>
+    </div>
+  `;
+}
+
+function renderMT5Preview(){
+  const rows = [];
+  const grp = (label)=>`<tr class="group-row"><td colspan="2">${label}</td></tr>`;
+  const row = (k,v)=>`<tr><td>${k}</td><td>${v}</td></tr>`;
+  rows.push(grp('General'));
+  rows.push(row('Magic Number', state.magic));
+  rows.push(grp('Lot Size'));
+  if(state.lotMode==='fixed') rows.push(row('Lot Size (Fixed)', state.fixedLot));
+  else rows.push(row('Risk % per Trade', state.riskPercent + '%'));
+  rows.push(grp('SL / TP'));
+  rows.push(row('Stop Loss', state.slPips + ' pts'));
+  rows.push(row('Take Profit', state.tpPips + ' pts'));
+  rows.push(row('Max Spread', state.maxSpread + ' pts'));
+  if(state.useTrailing){
+    rows.push(grp('Trailing Stop'));
+    rows.push(row('Trailing Start', state.trailingStart + ' pts'));
+    rows.push(row('Trailing Step', state.trailingStep + ' pts'));
+  }
+  if(state.useTimeFilter){
+    rows.push(grp('Time Filter'));
+    rows.push(row('Start / End Hour', state.startHour + ' – ' + state.endHour));
+  }
+  if(state.useDailyLoss){
+    rows.push(grp('Daily Protection'));
+    rows.push(row('Max Daily Loss', '$' + state.maxDailyLossUSD));
+  }
+  if(state.useNewsFilter){
+    const impMap = {'1':'Low+','2':'Medium+','3':'High only'};
+    rows.push(grp('News Filter'));
+    rows.push(row('Currency / Importance', state.newsCurrency + ' · ' + impMap[state.newsImportance]));
+    rows.push(row('Block Window', '-' + state.newsMinutesAfter + 'm / +' + state.newsMinutesBefore + 'm'));
+  }
+  rows.push(grp(TEMPLATES[state.template].name));
+  if(state.template==='breakout'){
+    const p = state.params.breakout;
+    rows.push(row('Range Bars', p.rangeBars));
+    rows.push(row('Breakout Buffer', p.breakoutBuffer + ' pts'));
+  } else if(state.template==='grid'){
+    const p = state.params.grid;
+    rows.push(row('Initial Lot', p.initialLot));
+    rows.push(row('Lot Multiplier', p.lotMultiplier));
+    rows.push(row('Grid Step', p.gridStep + ' pts'));
+    rows.push(row('Max Trades', p.maxTrades));
+    rows.push(row('Basket TP', '$' + p.basketTP));
+    rows.push(row('Direction', p.direction));
+  } else if(state.template==='crossover'){
+    const p = state.params.crossover;
+    rows.push(row('Fast MA', p.fastMA));
+    rows.push(row('Slow MA', p.slowMA));
+    rows.push(row('MA Method', p.maMethod));
+    if(p.useRSIFilter){
+      rows.push(row('RSI Filter', p.rsiPeriod + ' (' + p.rsiOS + '/' + p.rsiOB + ')'));
+    }
+  } else if(state.template==='ictsmc'){
+    const p = state.params.ictsmc;
+    rows.push(row('Swing Lookback', p.swingLookback));
+    rows.push(row('Wick Buffer', p.wickBufferPts + ' pts'));
+    rows.push(row('Reward:Risk', '1 : ' + p.rrRatio));
+  }
+  return rows.join('');
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function copyCode(){
+  navigator.clipboard.writeText(generateCode());
+  const btn = event.target;
+  const old = btn.textContent;
+  btn.textContent = '✓ Tersalin';
+  setTimeout(()=>{ btn.textContent = old; }, 1500);
+}
+function downloadCode(){
+  const blob = new Blob([generateCode()], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = state.eaName + '.mq5';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ================= CODE GENERATION ================= */
+function generateCode(){
+  const s = state;
+  let inputs = `input group "=== General Settings ==="
+input int      InpMagicNumber      = ${s.magic};        // Magic Number
+input double   InpFixedLot         = ${s.lotMode==='fixed'?s.fixedLot:0.01};        // Fixed Lot Size (used if RiskPercent = 0)
+input double   InpRiskPercent      = ${s.lotMode==='risk'?s.riskPercent:0};        // Risk % per Trade (0 = use Fixed Lot)
+input int      InpStopLossPts      = ${s.slPips};          // Stop Loss (points)
+input int      InpTakeProfitPts    = ${s.tpPips};          // Take Profit (points)
+input int      InpMaxSpreadPts     = ${s.maxSpread};           // Max Allowed Spread (points)
+input group "=== Trailing Stop ==="
+input bool     InpUseTrailing      = ${s.useTrailing};
+input int      InpTrailingStartPts = ${s.trailingStart};
+input int      InpTrailingStepPts  = ${s.trailingStep};
+input group "=== Trading Hours Filter ==="
+input bool     InpUseTimeFilter    = ${s.useTimeFilter};
+input int      InpStartHour        = ${s.startHour};
+input int      InpEndHour          = ${s.endHour};
+input group "=== Daily Loss Protection ==="
+input bool     InpUseDailyLossLimit= ${s.useDailyLoss};
+input double   InpMaxDailyLossUSD  = ${s.maxDailyLossUSD};
+input group "=== News Filter (Economic Calendar) ==="
+input bool     InpUseNewsFilter    = ${s.useNewsFilter};
+input string   InpNewsCurrency     = "${s.newsCurrency}";
+input int      InpNewsMinImportance= ${s.newsImportance};    // 1=Low, 2=Medium, 3=High
+input int      InpNewsMinutesBefore= ${s.newsMinutesBefore};
+input int      InpNewsMinutesAfter = ${s.newsMinutesAfter};
+`;
+
+  if(s.template==='breakout'){
+    const p = s.params.breakout;
+    inputs += `input group "=== Breakout Settings ==="
+input int      InpRangeBars        = ${p.rangeBars};          // Bars used to define range high/low
+input int      InpBreakoutBufferPts= ${p.breakoutBuffer};          // Breakout confirmation buffer (points)
+`;
+  } else if(s.template==='grid'){
+    const p = s.params.grid;
+    const dirMap = {both:0, buy:1, sell:2};
+    inputs += `input group "=== Grid / DCA Settings ==="
+input double   InpInitialLot       = ${p.initialLot};
+input double   InpLotMultiplier    = ${p.lotMultiplier};
+input int      InpGridStepPts      = ${p.gridStep};
+input int      InpMaxTrades        = ${p.maxTrades};
+input double   InpBasketTakeProfitUSD = ${p.basketTP};
+input int      InpDirection        = ${dirMap[p.direction]};      // 0=Both, 1=Buy Only, 2=Sell Only
+`;
+  } else if(s.template==='crossover'){
+    const p = s.params.crossover;
+    inputs += `input group "=== MA Crossover Settings ==="
+input int      InpFastMA           = ${p.fastMA};
+input int      InpSlowMA           = ${p.slowMA};
+input ENUM_MA_METHOD    InpMAMethod   = ${p.maMethod};
+input ENUM_APPLIED_PRICE InpAppliedPrice = ${p.appliedPrice};
+input group "=== RSI Filter ==="
+input bool     InpUseRSIFilter     = ${p.useRSIFilter};
+input int      InpRSIPeriod        = ${p.rsiPeriod};
+input int      InpRSIOverbought    = ${p.rsiOB};
+input int      InpRSIOversold      = ${p.rsiOS};
+`;
+  } else if(s.template==='ictsmc'){
+    const p = s.params.ictsmc;
+    inputs += `input group "=== ICT/SMC Liquidity Sweep Settings ==="
+input int      InpSwingLookback    = ${p.swingLookback};        // Bars used to find swing high/low
+input int      InpWickBufferPts    = ${p.wickBufferPts};        // SL buffer beyond swept wick (points)
+input double   InpRewardRiskRatio  = ${p.rrRatio};        // TP = SL distance x this ratio
+`;
+  }
+
+  let handles = '';
+  let handleInit = '';
+  if(s.template==='crossover'){
+    handles = `int handleFastMA, handleSlowMA, handleRSI;`;
+    handleInit = `
+   handleFastMA = iMA(_Symbol, _Period, InpFastMA, 0, InpMAMethod, InpAppliedPrice);
+   handleSlowMA = iMA(_Symbol, _Period, InpSlowMA, 0, InpMAMethod, InpAppliedPrice);
+   handleRSI    = iRSI(_Symbol, _Period, InpRSIPeriod, PRICE_CLOSE);
+   if(handleFastMA==INVALID_HANDLE || handleSlowMA==INVALID_HANDLE || handleRSI==INVALID_HANDLE)
+   {
+      Print("Gagal membuat indicator handle");
+      return(INIT_FAILED);
+   }`;
+  }
+
+  let templateLogic = '';
+  if(s.template==='breakout') templateLogic = breakoutLogic();
+  else if(s.template==='grid') templateLogic = gridLogic();
+  else if(s.template==='crossover') templateLogic = crossoverLogic();
+  else if(s.template==='ictsmc') templateLogic = ictsmcLogic();
+
+  const needsNewBar = s.template !== 'grid'; // grid checks basket profit every tick too
+
+  return `//+------------------------------------------------------------------+
+//|                                            ${s.eaName}.mq5 |
+//|                     Dibuat dengan Botsmith (No-Code EA Builder)   |
+//|                     Template: ${TEMPLATES[s.template].name}
+//+------------------------------------------------------------------+
+#property copyright "${s.eaName}"
+#property version   "1.00"
+#property strict
+
+#include <Trade\\Trade.mqh>
+CTrade trade;
+${handles}
+
+${inputs}
+//--- state variables
+datetime g_lastBarTime = 0;
+double   g_dayStartBalance = 0;
+datetime g_dayStartTime = 0;
+
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   trade.SetExpertMagicNumber(InpMagicNumber);
+   g_dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   g_dayStartTime = TimeCurrent();
+${handleInit}
+   return(INIT_SUCCEEDED);
+}
+
+void OnDeinit(const int reason)
+{
+}
+
+//+------------------------------------------------------------------+
+bool IsNewBar()
+{
+   datetime t = iTime(_Symbol, _Period, 0);
+   if(t != g_lastBarTime){ g_lastBarTime = t; return true; }
+   return false;
+}
+
+bool IsWithinTradingHours()
+{
+   if(!InpUseTimeFilter) return true;
+   MqlDateTime dt; TimeToStruct(TimeCurrent(), dt);
+   if(InpStartHour <= InpEndHour)
+      return (dt.hour >= InpStartHour && dt.hour <= InpEndHour);
+   else
+      return (dt.hour >= InpStartHour || dt.hour <= InpEndHour);
+}
+
+bool DailyLossLimitHit()
+{
+   if(!InpUseDailyLossLimit) return false;
+   MqlDateTime now, start;
+   TimeToStruct(TimeCurrent(), now);
+   TimeToStruct(g_dayStartTime, start);
+   if(now.day != start.day || now.mon != start.mon)
+   {
+      g_dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+      g_dayStartTime = TimeCurrent();
+   }
+   double loss = g_dayStartBalance - AccountInfoDouble(ACCOUNT_EQUITY);
+   return (loss >= InpMaxDailyLossUSD);
+}
+
+bool IsNewsTimeBlocked()
+{
+   if(!InpUseNewsFilter) return false;
+   datetime now  = TimeCurrent();
+   datetime from = now - InpNewsMinutesAfter*60;
+   datetime to   = now + InpNewsMinutesBefore*60;
+
+   MqlCalendarValue values[];
+   string currency = (InpNewsCurrency=="XAU") ? "USD" : InpNewsCurrency; // XAU gold moves mainly on USD news
+   int count = CalendarValueHistory(values, from, to, NULL, currency);
+   if(count <= 0) return false;
+
+   for(int i=0; i<count; i++)
+   {
+      MqlCalendarEvent ev;
+      if(!CalendarEventById(values[i].event_id, ev)) continue;
+      if((int)ev.importance >= InpNewsMinImportance) return true;
+   }
+   return false;
+}
+
+double CalcLotSize()
+{
+   if(InpRiskPercent <= 0) return InpFixedLot;
+   double balance   = AccountInfoDouble(ACCOUNT_BALANCE);
+   double riskUSD   = balance * InpRiskPercent / 100.0;
+   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   double lot       = riskUSD / (InpStopLossPts * tickValue);
+   double lotStep   = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   double minLot    = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot    = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   lot = MathFloor(lot/lotStep)*lotStep;
+   return MathMax(minLot, MathMin(maxLot, lot));
+}
+
+int CountOpenPositions()
+{
+   int c = 0;
+   for(int i=0; i<PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(PositionSelectByTicket(ticket))
+         if(PositionGetString(POSITION_SYMBOL)==_Symbol && PositionGetInteger(POSITION_MAGIC)==InpMagicNumber)
+            c++;
+   }
+   return c;
+}
+
+void ApplyTrailingStop()
+{
+   if(!InpUseTrailing) return;
+   double point = _Point;
+   for(int i=0; i<PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(!PositionSelectByTicket(ticket)) continue;
+      if(PositionGetString(POSITION_SYMBOL)!=_Symbol || PositionGetInteger(POSITION_MAGIC)!=InpMagicNumber) continue;
+
+      long type = PositionGetInteger(POSITION_TYPE);
+      double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+      double curSL = PositionGetDouble(POSITION_SL);
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+      if(type==POSITION_TYPE_BUY)
+      {
+         double profitPts = (bid - openPrice)/point;
+         if(profitPts >= InpTrailingStartPts)
+         {
+            double newSL = bid - InpTrailingStepPts*point;
+            if(newSL > curSL || curSL==0)
+               trade.PositionModify(ticket, newSL, PositionGetDouble(POSITION_TP));
+         }
+      }
+      else if(type==POSITION_TYPE_SELL)
+      {
+         double profitPts = (openPrice - ask)/point;
+         if(profitPts >= InpTrailingStartPts)
+         {
+            double newSL = ask + InpTrailingStepPts*point;
+            if(newSL < curSL || curSL==0)
+               trade.PositionModify(ticket, newSL, PositionGetDouble(POSITION_TP));
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   if(DailyLossLimitHit()) return;
+   if(!IsWithinTradingHours()) return;
+   if(IsNewsTimeBlocked()) return;
+
+   long spread = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+   if(spread > InpMaxSpreadPts) return;
+
+   ApplyTrailingStop();
+
+${templateLogic}
+}
+`;
+}
+
+function breakoutLogic(){
+  return `   if(!IsNewBar()) return;
+
+   int highIdx = iHighest(_Symbol, _Period, MODE_HIGH, InpRangeBars, 1);
+   int lowIdx  = iLowest(_Symbol, _Period, MODE_LOW, InpRangeBars, 1);
+   double rangeHigh = iHigh(_Symbol, _Period, highIdx);
+   double rangeLow  = iLow(_Symbol, _Period, lowIdx);
+   double closePrice = iClose(_Symbol, _Period, 1);
+   double point = _Point;
+
+   if(CountOpenPositions() > 0) return;
+
+   if(closePrice > rangeHigh + InpBreakoutBufferPts*point)
+   {
+      double lot = CalcLotSize();
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      double sl = ask - InpStopLossPts*point;
+      double tp = ask + InpTakeProfitPts*point;
+      trade.Buy(lot, _Symbol, ask, sl, tp, "Breakout Buy");
+   }
+   else if(closePrice < rangeLow - InpBreakoutBufferPts*point)
+   {
+      double lot = CalcLotSize();
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double sl = bid + InpStopLossPts*point;
+      double tp = bid - InpTakeProfitPts*point;
+      trade.Sell(lot, _Symbol, bid, sl, tp, "Breakout Sell");
+   }`;
+}
+
+function gridLogic(){
+  return `   double point = _Point;
+   int openCount = CountOpenPositions();
+
+   //--- cek profit basket, tutup semua kalau target tercapai
+   double totalProfit = 0;
+   long lastType = -1;
+   double lastPrice = 0;
+   for(int i=0; i<PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(!PositionSelectByTicket(ticket)) continue;
+      if(PositionGetString(POSITION_SYMBOL)!=_Symbol || PositionGetInteger(POSITION_MAGIC)!=InpMagicNumber) continue;
+      totalProfit += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP) + PositionGetDouble(POSITION_COMMISSION);
+      lastType = PositionGetInteger(POSITION_TYPE);
+      lastPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+   }
+
+   if(openCount > 0 && totalProfit >= InpBasketTakeProfitUSD)
+   {
+      for(int i=PositionsTotal()-1; i>=0; i--)
+      {
+         ulong ticket = PositionGetTicket(i);
+         if(!PositionSelectByTicket(ticket)) continue;
+         if(PositionGetString(POSITION_SYMBOL)==_Symbol && PositionGetInteger(POSITION_MAGIC)==InpMagicNumber)
+            trade.PositionClose(ticket);
+      }
+      return;
+   }
+
+   if(!IsNewBar()) return;
+
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+   if(openCount == 0)
+   {
+      //--- entry awal: arah ditentukan dari candle sebelumnya, difilter oleh InpDirection
+      double prevOpen = iOpen(_Symbol, _Period, 1);
+      double prevClose = iClose(_Symbol, _Period, 1);
+      bool wantBuy  = (prevClose > prevOpen) && (InpDirection==0 || InpDirection==1);
+      bool wantSell = (prevClose < prevOpen) && (InpDirection==0 || InpDirection==2);
+
+      if(wantBuy)
+         trade.Buy(InpInitialLot, _Symbol, ask, 0, 0, "Grid Init Buy");
+      else if(wantSell)
+         trade.Sell(InpInitialLot, _Symbol, bid, 0, 0, "Grid Init Sell");
+   }
+   else if(openCount < InpMaxTrades)
+   {
+      //--- tambah level grid kalau harga bergerak melawan posisi terakhir sejauh InpGridStepPts
+      double nextLot = InpInitialLot * MathPow(InpLotMultiplier, openCount);
+      if(lastType==POSITION_TYPE_BUY && bid <= lastPrice - InpGridStepPts*point)
+         trade.Buy(nextLot, _Symbol, ask, 0, 0, "Grid Add Buy");
+      else if(lastType==POSITION_TYPE_SELL && ask >= lastPrice + InpGridStepPts*point)
+         trade.Sell(nextLot, _Symbol, bid, 0, 0, "Grid Add Sell");
+   }`;
+}
+
+function crossoverLogic(){
+  return `   if(!IsNewBar()) return;
+
+   double fastBuf[], slowBuf[], rsiBuf[];
+   ArraySetAsSeries(fastBuf, true);
+   ArraySetAsSeries(slowBuf, true);
+   ArraySetAsSeries(rsiBuf, true);
+
+   if(CopyBuffer(handleFastMA, 0, 0, 3, fastBuf) < 3) return;
+   if(CopyBuffer(handleSlowMA, 0, 0, 3, slowBuf) < 3) return;
+   if(InpUseRSIFilter) { if(CopyBuffer(handleRSI, 0, 0, 3, rsiBuf) < 3) return; }
+
+   bool crossUp   = (fastBuf[2] <= slowBuf[2]) && (fastBuf[1] > slowBuf[1]);
+   bool crossDown = (fastBuf[2] >= slowBuf[2]) && (fastBuf[1] < slowBuf[1]);
+
+   if(InpUseRSIFilter)
+   {
+      if(crossUp && rsiBuf[1] >= InpRSIOverbought) crossUp = false;
+      if(crossDown && rsiBuf[1] <= InpRSIOversold) crossDown = false;
+   }
+
+   if(CountOpenPositions() > 0) return;
+
+   double point = _Point;
+   if(crossUp)
+   {
+      double lot = CalcLotSize();
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      trade.Buy(lot, _Symbol, ask, ask - InpStopLossPts*point, ask + InpTakeProfitPts*point, "MA Cross Buy");
+   }
+   else if(crossDown)
+   {
+      double lot = CalcLotSize();
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      trade.Sell(lot, _Symbol, bid, bid + InpStopLossPts*point, bid - InpTakeProfitPts*point, "MA Cross Sell");
+   }`;
+}
+
+function ictsmcLogic(){
+  return `   if(!IsNewBar()) return;
+   if(CountOpenPositions() > 0) return;
+
+   double point = _Point;
+   //--- swing high/low dari candle sebelum candle sweep (index 2..InpSwingLookback+1)
+   int highIdx = iHighest(_Symbol, _Period, MODE_HIGH, InpSwingLookback, 2);
+   int lowIdx  = iLowest(_Symbol, _Period, MODE_LOW, InpSwingLookback, 2);
+   double swingHigh = iHigh(_Symbol, _Period, highIdx);
+   double swingLow  = iLow(_Symbol, _Period, lowIdx);
+
+   double prevHigh  = iHigh(_Symbol, _Period, 1);
+   double prevLow   = iLow(_Symbol, _Period, 1);
+   double prevClose = iClose(_Symbol, _Period, 1);
+
+   //--- bearish sweep: wick tembus swing high tapi close kembali di bawahnya -> SELL
+   bool bearishSweep = (prevHigh > swingHigh) && (prevClose < swingHigh);
+   //--- bullish sweep: wick tembus swing low tapi close kembali di atasnya -> BUY
+   bool bullishSweep = (prevLow < swingLow) && (prevClose > swingLow);
+
+   if(bullishSweep)
+   {
+      double lot = CalcLotSize();
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      double slDist = (ask - prevLow) + InpWickBufferPts*point;
+      double sl = ask - slDist;
+      double tp = ask + slDist*InpRewardRiskRatio;
+      trade.Buy(lot, _Symbol, ask, sl, tp, "ICT Sweep Buy");
+   }
+   else if(bearishSweep)
+   {
+      double lot = CalcLotSize();
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double slDist = (prevHigh - bid) + InpWickBufferPts*point;
+      double sl = bid + slDist;
+      double tp = bid - slDist*InpRewardRiskRatio;
+      trade.Sell(lot, _Symbol, bid, sl, tp, "ICT Sweep Sell");
+   }`;
+}
+
+render();
+refreshPresetList();
+</script>
+</body>
+</html>
